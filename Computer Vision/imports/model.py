@@ -64,9 +64,10 @@ class RetinaNet(nn.Module):
         for merge in self.merges: p_states = [merge(p_states[0])] + p_states
         for i, smooth in enumerate(self.smoothers[:3]):
             p_states[i] = smooth(p_states[i])
-        return [self._apply_transpose(self.classifier, p_states, self.n_classes), 
-                self._apply_transpose(self.box_regressor, p_states, 4),
-                [[p.size(2), p.size(3)] for p in p_states]]
+        
+        self.sizes = [[p.size(2), p.size(3)] for p in p_states]
+        return [self._apply_transpose(self.box_regressor, p_states, 4),
+            self._apply_transpose(self.classifier, p_states, self.n_classes)]
     
     def __del__(self):
         if hasattr(self, "sfs"): self.sfs.remove()

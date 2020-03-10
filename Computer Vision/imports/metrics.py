@@ -94,12 +94,16 @@ def IoU_values(anchs, targs):
     return inter/(union+1e-8)
 
 class RetinaNetFocalLoss(nn.Module):
-    def __init__(self, gamma:float=2., alpha:float=0.25,  pad_idx:int=0, scales=None, ratios=None, reg_loss=F.smooth_l1_loss):
+    def __init__(self, model, gamma:float=2., alpha:float=0.25,  pad_idx:int=0, scales=None, ratios=None, reg_loss=F.smooth_l1_loss):
         super().__init__()
+        self.model = model
         self.gamma,self.alpha,self.pad_idx,self.reg_loss = gamma,alpha,pad_idx,reg_loss
         self.scales = ifnone(scales, [1,2**(-1/3), 2**(-2/3)])
         self.ratios = ifnone(ratios, [1/2,1,2])
         
+    
+    def decodes(self, x):    return (x[0], x[1].argmax(dim=-1))
+    
     def _change_anchors(self, sizes) -> bool:
         if not hasattr(self, 'sizes'): return True
         for sz1, sz2 in zip(self.sizes, sizes):
@@ -141,7 +145,8 @@ class RetinaNetFocalLoss(nn.Module):
         return bb_loss + self._focal_loss(clas_pred, clas_tgt)/torch.clamp(bbox_mask.sum(), min=1.)
     
     def forward(self, output, bbox_tgts, clas_tgts):
-        clas_preds, bbox_preds, sizes = output
+        bbox_preds, clas_preds = output
+        sizes = self.model.sizes
         if self._change_anchors(sizes): self._create_anchors(sizes, clas_preds.device)
         n_classes = clas_preds.size(2)
         return sum([self._one_loss(cp, bp, ct, bt)
